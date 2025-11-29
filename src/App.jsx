@@ -1,26 +1,135 @@
-// src/App.jsx
 import React from 'react';
-import { BrowserRouter, Routes, Route, NavLink } from 'react-router-dom';
+import { HashRouter, Routes, Route, NavLink } from 'react-router-dom';
 
+/* -----------------------
+   Minimal auth helpers
+   ----------------------- */
+const AUTH_KEY = 'smartcity-auth';
+function isAuthenticated() {
+  return !!localStorage.getItem(AUTH_KEY);
+}
+function storeAuth(email) {
+  localStorage.setItem(AUTH_KEY, JSON.stringify({ email, token: 'demo-token', loggedAt: Date.now() }));
+}
+function clearAuth() {
+  localStorage.removeItem(AUTH_KEY);
+}
+
+/* ---------- App (merged with Login) ---------- */
 export default function App() {
+  // local auth state: show login if not authenticated
+  const [auth, setAuth] = React.useState(() => isAuthenticated());
+
+  if (!auth) {
+    return <Login onSuccess={() => setAuth(true)} />;
+  }
+
   return (
-    <BrowserRouter>
-      <div className="app-container">
-        <Sidebar />
+    <HashRouter>
+      <div className="app">
+        <Sidebar onLogout={() => { clearAuth(); setAuth(false); }} />
         <MainPanel />
       </div>
-    </BrowserRouter>
+    </HashRouter>
+  );
+}
+
+/* ---------- Login Component (minimal, demo) ---------- */
+function Login({ onSuccess }) {
+  const [email, setEmail] = React.useState('');
+  const [password, setPassword] = React.useState('');
+  const [error, setError] = React.useState('');
+  const [loading, setLoading] = React.useState(false);
+
+  function validate() {
+    setError('');
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email.trim())) {
+      setError('Please enter a valid email address.');
+      return false;
+    }
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters long.');
+      return false;
+    }
+    return true;
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault();
+    if (!validate()) return;
+    setLoading(true);
+    // simulate network delay
+    await new Promise(r => setTimeout(r, 350));
+    storeAuth(email.trim());
+    setLoading(false);
+    onSuccess && onSuccess();
+  }
+
+  return (
+    <div className="page login-page" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+      <div className="login-card" style={{ width: 420, borderRadius: 10, padding: 20 }}>
+        <h2>SmartCity — Login</h2>
+        <p className="muted">Sign in to manage or report city issues.</p>
+
+        <form onSubmit={handleSubmit} style={{ marginTop: 12 }}>
+          <label style={{ display: 'block', marginBottom: 10 }}>
+            <div className="label">Email</div>
+            <input
+              type="email"
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              placeholder="you@example.com"
+              style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #ddd' }}
+              autoFocus
+            />
+          </label>
+
+          <label style={{ display: 'block', marginBottom: 10 }}>
+            <div className="label">Password</div>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              placeholder="Minimum 6 characters"
+              style={{ width: '100%', padding: 8, borderRadius: 6, border: '1px solid #ddd' }}
+            />
+          </label>
+
+          {error && <div style={{ color: '#b00020', marginBottom: 8 }}>{error}</div>}
+
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button type="submit" className="btn primary" style={{ flex: 1 }} disabled={loading}>
+              {loading ? 'Signing in…' : 'Sign in'}
+            </button>
+            <button
+              type="button"
+              className="btn ghost"
+              style={{ flex: 1 }}
+              onClick={() => { setEmail(''); setPassword(''); setError(''); }}
+              disabled={loading}
+            >
+              Clear
+            </button>
+          </div>
+
+          <div style={{ marginTop: 10, fontSize: 13, color: '#666' }}>
+            Demo: use any valid email and a password ≥ 6 chars.
+          </div>
+        </form>
+      </div>
+    </div>
   );
 }
 
 /* ---------- Sidebar ---------- */
-function Sidebar() {
+function Sidebar({ onLogout }) {
   const [open, setOpen] = React.useState(true);
 
   return (
     <aside className={`sidebar ${open ? 'open' : 'collapsed'}`}>
       <div className="brand">
-        <div className="logo">🏙️</div>
+        <div className="logo">🏙</div>
         <div className="title">SmartCity</div>
       </div>
 
@@ -42,6 +151,17 @@ function Sidebar() {
       <div className="sidebar-footer">
         <button className="btn ghost" onClick={() => setOpen(s => !s)}>
           {open ? 'Collapse' : 'Expand'}
+        </button>
+
+        <button
+          className="btn"
+          onClick={() => {
+            // trigger logout handed from parent
+            if (onLogout) onLogout();
+            else { clearAuth(); window.location.reload(); }
+          }}
+        >
+          Logout
         </button>
       </div>
     </aside>
@@ -119,7 +239,13 @@ function Services() {
     { id: 1, name: 'Water Supply', desc: 'Distribution schedule & updates.' },
     { id: 2, name: 'Electricity', desc: 'Scheduled outages and notices.' },
     { id: 3, name: 'Waste Management', desc: 'Pickup schedule & recycling.' },
-    { id: 4, name: 'Roads & Transport', desc: 'Roadworks and transit alerts.' }
+    { id: 4, name: 'Roads & Transport', desc: 'Roadworks and transit alerts.' },
+    { id: 5, name: 'Public Safety', desc: 'Police, emergency contacts and safety alerts.' },
+    { id: 6, name: 'Healthcare Services', desc: 'Nearby hospitals, clinics and health camps.' },
+    { id: 7, name: 'Street Lighting', desc: 'Faulty streetlights and maintenance updates.' },
+    { id: 8, name: 'Parks & Recreation', desc: 'Park timings, cleanliness and events.' },
+    { id: 9, name: 'Drainage & Sewage', desc: 'Drainage cleaning, blockages and updates.' },
+    { id: 10, name: 'Public Transport', desc: 'Bus routes, timings and service changes.' }
   ];
 
   return (
@@ -147,26 +273,36 @@ function ServiceGrid() {
     { id: 1, name: 'Water Supply', status: 'Normal', desc: 'Distribution schedule & updates.' },
     { id: 2, name: 'Electricity', status: 'Maintenance', desc: 'Scheduled outages and notices.' },
     { id: 3, name: 'Waste Management', status: 'Normal', desc: 'Pickup schedule & recycling.' },
-    { id: 4, name: 'Roads & Transport', status: 'In Progress', desc: 'Roadworks and transit alerts.' }
+    { id: 4, name: 'Roads & Transport', status: 'In Progress', desc: 'Roadworks and transit alerts.' },
+    { id: 5, name: 'Street Lighting', status: 'Normal', desc: 'Streetlight repair & monitoring.' },
+    { id: 6, name: 'Healthcare Services', status: 'Normal', desc: 'Hospitals, clinics & health help.' },
+    { id: 7, name: 'Public Safety', status: 'Alert', desc: 'Emergencies and police alerts.' },
+    { id: 8, name: 'Drainage & Sewage', status: 'In Progress', desc: 'Drainage cleanup & reports.' },
+    { id: 9, name: 'Parks & Recreation', status: 'Normal', desc: 'Park status and activities.' },
+    { id: 10, name: 'Public Transport', status: 'Maintenance', desc: 'Service interruptions & updates.' }
   ];
 
   return (
     <div className="grid">
-      {services.map(s => (
-        <article key={s.id} className="service-card" tabIndex={0}>
-          <div className="card-head">
-            <h3>{s.name}</h3>
-            <span className={`pill ${s.status === 'Normal' ? 'green' : s.status === 'Maintenance' ? 'amber' : 'blue'}`}>
-              {s.status}
-            </span>
-          </div>
-          <p className="muted">{s.desc}</p>
-          <div className="card-actions">
-            <button className="btn small">View</button>
-            <button className="btn ghost small">Report</button>
-          </div>
-        </article>
-      ))}
+      {services.map(s => {
+        // safe className for pill (no spaces, lowercased)
+        const safeStatusClass = s.status.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9\-]/g, '');
+        return (
+          <article key={s.id} className="service-card" tabIndex={0}>
+            <div className="card-head">
+              <h3>{s.name}</h3>
+              <span className={`pill ${safeStatusClass}`} style={pillStyle(s.status)}>
+                {s.status}
+              </span>
+            </div>
+            <p className="muted">{s.desc}</p>
+            <div className="card-actions">
+              <button className="btn small">View</button>
+              <button className="btn ghost small">Report</button>
+            </div>
+          </article>
+        );
+      })}
     </div>
   );
 }
@@ -284,3 +420,15 @@ function AdminPanel() {
     </div>
   );
 }
+
+/* ---------- small inline pill style helper (keeps previous behavior) ---------- */
+const pillStyle = status => {
+  const base = { padding: '6px 10px', borderRadius: 999, fontSize: 12, fontWeight: 700 };
+  switch (status) {
+    case 'Normal': return { ...base, background: '#e6fff3', color: '#0b8646' };
+    case 'Maintenance': return { ...base, background: '#fff7e6', color: '#b36b00' };
+    case 'In Progress': return { ...base, background: '#e9f2ff', color: '#155bb0' };
+    case 'Alert': return { ...base, background: '#ffecec', color: '#b00020' };
+    default: return base;
+  }
+};
